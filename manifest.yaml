@@ -1,0 +1,17 @@
+# Easy to edit — dest supports $HOME, $DOCUMENTS, %VAR%, ${VAR}, ~ platforms: [win32, linux, darwin] or omit for all
+
+links:
+  - src: nvim
+    dest: "%LOCALAPPDATA%/nvim"
+    platforms: [win32]
+  - src: nvim
+    dest: "$HOME/.config/nvim"
+    platforms: [linux, darwin]
+  - src: wezterm/wezterm.lua
+    dest: "$HOME/.config/wezterm/wezterm.lua"
+  - src: powershell/Microsoft.PowerShell_profile.ps1
+    dest: "$DOCUMENTS/WindowsPowerShell/Microsoft.PowerShell_profile.ps1"
+    platforms: [win32]
+  - src: powershell/Microsoft.PowerShell_profile.ps1
+    dest: "$DOCUMENTS/PowerShell/Microsoft.PowerShell_profile.ps1"
+    platforms: [win32]

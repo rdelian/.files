@@ -1,0 +1,19 @@
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# nvim - don't commit transient state, keep lock for reproducibility if you want
+# Uncomment to ignore lock:
+# nvim/lazy-lock.json
+nvim/.cache/
+nvim/.undo/
+
+# wezterm - no cache
+# powershell - no secrets (repo is public)
