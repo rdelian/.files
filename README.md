@@ -1,8 +1,8 @@
 # .files
 
-Single repo for **Windows 11 + Linux** dotfiles. Manifest-driven `bun` bootstrap with no deps.
+Single repo for **Windows 11 + Linux** dotfiles. Manifest-driven bootstrap with no deps.
 
-`manifest.yaml` example (Bun's built-in `Bun.YAML.parse`, no npm):
+`manifest.yaml`:
 
 ```yaml
 links:
