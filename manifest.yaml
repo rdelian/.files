@@ -15,3 +15,6 @@ links:
   - src: powershell/Microsoft.PowerShell_profile.ps1
     dest: "$DOCUMENTS/PowerShell/Microsoft.PowerShell_profile.ps1"
     platforms: [win32]
+  - src: starship/starship-windows.toml
+    dest: "$HOME/.config/starship.toml"
+    platforms: [win32]

@@ -9,7 +9,7 @@ local bg_brightness = 0.05
 if wezterm.target_triple == "x86_64-pc-windows-msvc" then
   bg_brightness = 0.1
 
-  config.default_prog = { "powershell", "-NoLogo" }
+  config.default_prog = { "pwsh", "-NoLogo" }
   -- fonts
   config.font = wezterm.font("FiraCode Nerd Font Mono")
   config.font_size = 12
@@ -18,6 +18,8 @@ if wezterm.target_triple == "x86_64-pc-windows-msvc" then
 else
   config.window_background_image = '/home/deli/sGchLE5.jpeg'
 end
+
+config.color_scheme = "Monokai Remastered"
 
 config.window_background_image_hsb = {
   brightness = bg_brightness,
