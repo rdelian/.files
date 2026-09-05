@@ -1,8 +1,8 @@
 # dir -> eza  
-function l { eza --icons=auto --header --long --git @args }
-function lt { eza --icons=auto --header --long --git --tree @args }
-function ld { eza --icons=auto --header --long --git --only-dirs @args }
-function lf { eza --icons=auto --header --long --git --only-files @args }
+function l { eza --icons=auto -hAl --git @args }
+function lt { eza --icons=auto -hAlT --git @args }
+function ld { eza --icons=auto -hAlD --git @args }
+function lf { eza --icons=auto -hAlf --git @args }
 
 # Find using EveryThing + fzf
 function f {
