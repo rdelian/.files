@@ -1,6 +1,6 @@
 {
   "extras": [
-
+    "lazyvim.plugins.extras.lsp.neoconf"
   ],
   "install_version": 8,
   "news": {
