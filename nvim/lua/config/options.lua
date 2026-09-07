@@ -6,12 +6,12 @@ vim.opt.exrc = true
 
 vim.opt.list = true
 vim.opt.listchars = {
-  tab = "→ ",
+  tab = " ",
   space = "·",
   nbsp = "␣",
   trail = "•",
-  extends = ">",
-  precedes = "<",
+  extends = "",
+  precedes = "",
 }
 
 -- Use hard tabs for Go files
