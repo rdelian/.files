@@ -1,0 +1,76 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "version": 4,
+  "async": true,
+  "blocks": [
+    {
+      "type": "rprompt",
+      "segments": [
+        {
+          "type": "status",
+          "style": "plain",
+          "foreground": "#43D426",
+          "template": " {{ if eq .Code 0 }}\uf00c{{ else }}\uf071 {{ .Code }}{{ end }} ",
+          "powerline_symbol": "\ue0b0"
+        },
+        {
+          "type": "executiontime",
+          "style": "plain",
+          "foreground": "#43D426",
+          "template": " \uf252 {{ .FormattedMs }} ",
+          "powerline_symbol": "\ue0b0",
+          "options": {
+            "always_enabled": true,
+            "style": "austin"
+          }
+        }
+      ]
+    },
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "newline": false,
+      "force": false,
+      "segments": [
+        {
+          "type": "root",
+          "style": "plain",
+          "powerline_symbol": "\ue0b0",
+          "template": "\udb81\udccf ",
+          "foreground": "#ff0000"
+        },
+        {
+          "type": "git",
+          "style": "plain",
+          "foreground": "#fffa66",
+          "template": "<#FFFFFF>[</>{{ .HEAD }}{{if .BranchStatus }} {{ .BranchStatus }}{{ end }}{{ if .Working.Changed }} \udb81\udf19 {{ .Working.String }}{{ end }}{{ if .Staging.Changed }} \udb81\udf18 {{ .Staging.String }}{{ end }}<#FFFFFF>]</>",
+          "options": {
+            "branch_identical_icon": "\u2261",
+            "branch_gone_icon": "\u2262"
+          },
+          "cache": {
+            "duration": "10s",
+            "strategy": "folder"
+          }
+        },
+        {
+          "type": "path",
+          "style": "plain",
+          "foreground": "#47c2ff",
+          "template": "<#FFFFFF>[</>{{ .Path }}<#FFFFFF>]</>",
+          "powerline_symbol": "\ue0b0",
+          "options": {
+            "style": "agnoster_short",
+            "max_depth": 2
+          }
+        },
+        {
+          "type": "text",
+          "style": "plain",
+          "foreground": "#ffffff",
+          "template": " \uf101 "
+        }
+      ]
+    }
+  ]
+}

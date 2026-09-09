@@ -50,5 +50,9 @@ Invoke-Expression (& zoxide init powershell | Out-String)
 Set-Alias -Name cd -Value __zoxide_z -Option AllScope -Force
 
 # Starship
-function Invoke-Starship-TransientFunction { &starship module character }
-Invoke-Expression (&starship init powershell | Out-String)
+# function Invoke-Starship-TransientFunction { &starship module character }
+# Invoke-Expression (&starship init powershell | Out-String)
+
+# Has command caching resulting in faster prompts
+oh-my-posh init pwsh --config '~\.files\oh-my-posh\config.omp.json' | Invoke-Expression
+
