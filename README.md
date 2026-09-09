@@ -1,27 +1,12 @@
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/57bf593b-1a80-42d6-a2a4-5ac1baead653" />
+
 # .files
 
-Single repo for **Windows 11 + Linux** dotfiles. Manifest-driven bootstrap with no deps.
-
-`manifest.yaml`:
-
-```yaml
-links:
-  - src: nvim
-    dest: "%LOCALAPPDATA%/nvim"
-    platforms: [win32]
-  - src: nvim
-    dest: "$HOME/.config/nvim"
-    platforms: [linux, darwin]
-  - src: wezterm/wezterm.lua
-    dest: "$HOME/.config/wezterm/wezterm.lua"
-```
-`src:` is relative to repo root.\
-`dest:` supports `$HOME`, `~`, `$DOCUMENTS` (OneDrive-aware), `%VAR%`, `${VAR}`, `$VAR`, `$XDG_CONFIG_HOME` + `.env`.\
-`platforms:` optional - omit for all OS. 
+Single repo for **Windows 11 + Linux** dotfiles. Driven by the `manifest.yaml` file.
 
 ## How to use
 
-Requires `bun`.
+Requires `bun` (no external packages needed)
 
 ```powershell
 # Windows
@@ -30,30 +15,20 @@ irm bun.sh/install.ps1 | iex
 curl -fsSL https://bun.sh/install | bash
 ```
 Flags: `--dry-run`/`-d`, `--force`/`-f`, `--help`/`-h`.
-### Win
 
-```powershell
-git clone git@github.com:rdelian/.files.git $HOME/.files
-bun $HOME/.files/bootstrap.ts
-```
-
-### Linux
+# Init
 
 ```bash
 git clone git@github.com:rdelian/.files.git ~/.files
 bun ~/.files/bootstrap.ts
 ```
 
-`$DOCUMENTS` resolves via `[Environment]::GetFolderPath("MyDocuments")` - works with `OneDrive\Documents` or plain `Documents`.
+- For `cmd.exe` use `%userprofile%/.files`</small>
+- `$DOCUMENTS` env variale resolves via `[Environment]::GetFolderPath("MyDocuments")` so it works with `OneDrive\Documents` or plain `Documents`.
 
-## Daily edits
+## Edits
 
-Files are **symlinks** - edit target, you're editing repo:
-
-```powershell
-nvim $env:LOCALAPPDATA\nvim\lua\config\keymaps.lua # actually edits ~/.files/nvim/...
-code $HOME\.config\wezterm\wezterm.lua
-```
+Files are **symlinks** - so you can edit either the target or repo files, in the end only the repo files are edited.
 
 ## Adding a new dotfile
 
@@ -73,6 +48,13 @@ code $HOME\.config\wezterm\wezterm.lua
      - src: foo
        dest: "$HOME/.config/foo"
        platforms: [linux]
+   ```
+   Or multi platform:
+   ```yaml
+   links:
+     - src: nvim
+       dest: "$HOME/.config/nvim"
+       platforms: [linux, darwin]
    ```
 
 ## Notes
