@@ -40,6 +40,19 @@
           "powerline_symbol": "\ue0b0"
         },
         {
+          "type": "path",
+          "style": "plain",
+          "foreground": "#47c2ff",
+          "template": "<#FFFFFF>[</>{{ .Path }}<#FFFFFF>]</>",
+          "powerline_symbol": "\ue0b0",
+          "options": {
+            "style": "agnoster_short",
+            "max_depth": 2,
+            "hide_root_location": true,
+            "mapped_locations": {}
+          }
+        },
+        {
           "type": "git",
           "style": "plain",
           "foreground": "#fffa66",
@@ -56,24 +69,11 @@
           }
         },
         {
-          "type": "path",
-          "style": "plain",
-          "foreground": "#47c2ff",
-          "template": "<#FFFFFF>[</>{{ .Path }}<#FFFFFF>]</>",
-          "powerline_symbol": "\ue0b0",
-          "options": {
-            "style": "agnoster_short",
-            "max_depth": 2,
-            "hide_root_location": true,
-            "mapped_locations": {}
-          }
-        },
-        {
           "type": "text",
           "style": "plain",
-          "powerline_symbol": "\ue0b0",
+          "foreground": "#ffffff",
           "template": " \uf101 ",
-          "foreground": "#ffffff"
+          "powerline_symbol": "\ue0b0"
         }
       ]
     }
