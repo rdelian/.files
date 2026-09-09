@@ -6,8 +6,8 @@ vim.opt.exrc = true
 
 vim.opt.list = true
 vim.opt.listchars = {
-  tab = " ",
-  space = "⋅",
+  tab = " ",
+  space = " ",
   nbsp = "␣",
   trail = "•",
   extends = "",
