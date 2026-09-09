@@ -35,9 +35,9 @@
         {
           "type": "root",
           "style": "plain",
-          "powerline_symbol": "\ue0b0",
+          "foreground": "#ff0000",
           "template": "\udb81\udccf ",
-          "foreground": "#ff0000"
+          "powerline_symbol": "\ue0b0"
         },
         {
           "type": "git",
@@ -45,8 +45,10 @@
           "foreground": "#fffa66",
           "template": "<#FFFFFF>[</>{{ .HEAD }}{{if .BranchStatus }} {{ .BranchStatus }}{{ end }}{{ if .Working.Changed }} \udb81\udf19 {{ .Working.String }}{{ end }}{{ if .Staging.Changed }} \udb81\udf18 {{ .Staging.String }}{{ end }}<#FFFFFF>]</>",
           "options": {
-            "branch_identical_icon": "\u2261",
-            "branch_gone_icon": "\u2262"
+            "git_icon": "\udb80\udea2",
+            "github_icon": "\ue709",
+            "gitlab_icon": "\ue7eb",
+            "branch_icon": ""
           },
           "cache": {
             "duration": "10s",
@@ -61,14 +63,17 @@
           "powerline_symbol": "\ue0b0",
           "options": {
             "style": "agnoster_short",
-            "max_depth": 2
+            "max_depth": 2,
+            "hide_root_location": true,
+            "mapped_locations": {}
           }
         },
         {
           "type": "text",
           "style": "plain",
-          "foreground": "#ffffff",
-          "template": " \uf101 "
+          "powerline_symbol": "\ue0b0",
+          "template": " \uf101 ",
+          "foreground": "#ffffff"
         }
       ]
     }
