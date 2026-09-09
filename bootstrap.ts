@@ -110,10 +110,6 @@ class Bootstrap {
       const code = (e as NodeJS.ErrnoException)?.code;
       if (code !== "EEXIST") throw e;
     }
-    // Log creation only when we actually created something new is noisy to detect;
-    // mkdirSync with recursive:true is idempotent, so only log if dir was missing before.
-    // We already handled dryRun; for real run, check existence before would be TOCTOU,
-    // so we avoid extra log to keep output honest. Uncomment to log always:
     // console.log(`${DIM}mkdir ${dir}${RESET}`);
   }
 
