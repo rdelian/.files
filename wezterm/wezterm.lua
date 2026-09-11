@@ -9,7 +9,7 @@ local isWindows = wezterm.target_triple == "x86_64-pc-windows-msvc"
 --==  ==--
 --=======--
 if isWindows then
-	bg_brightness = 0.07
+	bg_brightness = 0.08
 
 	config.default_prog = { "pwsh", "-NoLogo" }
 	-- fonts
@@ -21,10 +21,11 @@ else
 	config.window_background_image = "/home/deli/sGchLE5.jpeg"
 end
 
-config.color_scheme = "Monokai Remastered"
+config.color_scheme = "Grey-green"
+-- config.color_scheme = "Ir Black (Gogh)"
 config.default_cursor_style = "BlinkingBlock"
 
-config.front_end = "WebGpu"
+config.front_end = "OpenGL"
 config.animation_fps = 240
 config.max_fps = 240
 config.cursor_blink_rate = 300

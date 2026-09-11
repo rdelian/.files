@@ -1,6 +1,6 @@
 # dir -> eza  
-function l { eza --icons=auto -hAl --git @args }
-function lt { eza --icons=auto -hAlT --git @args }
+function l { eza --group-directories-first --no-filesize --icons=auto -hAl --git @args } 
+function lt { eza --icons=auto -hAlT --git $argv -I ".git|node_modules|.venv|__pycache__" }
 function ld { eza --icons=auto -hAlD --git @args }
 function lf { eza --icons=auto -hAlf --git @args }
 
@@ -9,6 +9,15 @@ function f {
     param([string]$FileName)
     if ($FileName) {
         $selection = es $FileName | fzf
+        if ($selection) { return $selection }
+    }
+}
+
+# cd (f <search>)
+function cdf {
+    param([string]$FileName)
+    if ($FileName) {
+        $selection = cd (f $FileName)
         if ($selection) { return $selection }
     }
 }

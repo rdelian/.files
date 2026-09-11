@@ -8,7 +8,6 @@
 -- e.g. vim.api.nvim_del_augroup_by_name("lazyvim_wrap_spell")
 
 -- Forcibly clear background highlights on colorscheme load
-
 local function clear_bg()
   local groups = {
     "Normal",
@@ -31,11 +30,8 @@ local function clear_bg()
   end
 end
 
--- Re-apply every single time you navigate buffers or change themes
 vim.api.nvim_create_autocmd({ "ColorScheme", "BufEnter", "WinEnter" }, {
   pattern = "*",
   callback = clear_bg,
 })
-
--- Force immediate evaluation
 clear_bg()
