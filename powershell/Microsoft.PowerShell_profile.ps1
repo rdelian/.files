@@ -62,6 +62,8 @@ Set-Alias -Name cd -Value __zoxide_z -Option AllScope -Force
 # function Invoke-Starship-TransientFunction { &starship module character }
 # Invoke-Expression (&starship init powershell | Out-String)
 
-# Has command caching resulting in faster prompts
+# oh-my-posh has command caching resulting in faster prompts
 oh-my-posh init pwsh --config '~\.files\oh-my-posh\config.omp.json' | Invoke-Expression
+
+$PWD.Path
 
