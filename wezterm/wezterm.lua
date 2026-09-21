@@ -9,14 +9,14 @@ local isWindows = wezterm.target_triple == "x86_64-pc-windows-msvc"
 --==  ==--
 --=======--
 if isWindows then
-	bg_brightness = 0.05
+	bg_brightness = 0.1
 
 	config.default_prog = { "pwsh", "-NoLogo" }
 	-- fonts
 	config.font = wezterm.font("ShureTechMono Nerd Font Mono")
 	config.font_size = 16
 	-- bg
-	config.window_background_image = "K:/imgs/triage/Your profile_ni.png"
+	config.window_background_image = "K:/imgs/_vscode/static/_WhiteBg/Mechanic Corpse ThinkPad Wallpaper.png"
 else
 	config.window_background_image = "/home/deli/sGchLE5.jpeg"
 end
