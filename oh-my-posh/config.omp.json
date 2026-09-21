@@ -40,23 +40,10 @@
           "powerline_symbol": "\ue0b0"
         },
         {
-          "type": "path",
-          "style": "plain",
-          "foreground": "#47c2ff",
-          "template": "<#FFFFFF>[</>{{ .Path }}<#FFFFFF>]</>",
-          "powerline_symbol": "\ue0b0",
-          "options": {
-            "style": "agnoster_short",
-            "max_depth": 2,
-            "hide_root_location": true,
-            "mapped_locations": {}
-          }
-        },
-        {
           "type": "git",
           "style": "plain",
-          "foreground": "#fffa66",
-          "template": "<#FFFFFF>[</>{{ .HEAD }}{{if .BranchStatus }} {{ .BranchStatus }}{{ end }}{{ if .Working.Changed }} \udb81\udf19 {{ .Working.String }}{{ end }}{{ if .Staging.Changed }} \udb81\udf18 {{ .Staging.String }}{{ end }}<#FFFFFF>]</>",
+          "foreground": "red",
+          "template": "<#aFaFaF>[</>{{ .HEAD }}{{if .BranchStatus }} {{ .BranchStatus }}{{ end }}{{ if .Working.Changed }} \udb81\udf19 {{ .Working.String }}{{ end }}{{ if .Staging.Changed }} \udb81\udf18 {{ .Staging.String }}{{ end }}<#aFaFaF>]</>",
           "options": {
             "git_icon": "\udb80\udea2",
             "github_icon": "\ue709",
@@ -69,9 +56,22 @@
           }
         },
         {
+          "type": "path",
+          "style": "plain",
+          "foreground": "blue",
+          "template": "<#aFaFaF>[</>{{ .Path }}<#aFaFaF>]</>",
+          "powerline_symbol": "\ue0b0",
+          "options": {
+            "style": "agnoster_short",
+            "max_depth": 2,
+            "hide_root_location": true,
+            "mapped_locations": {}
+          }
+        },
+        {
           "type": "text",
           "style": "plain",
-          "foreground": "#ffffff",
+          "foreground": "default",
           "template": " \uf101 ",
           "powerline_symbol": "\ue0b0"
         }

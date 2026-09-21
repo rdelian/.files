@@ -4,32 +4,35 @@ config.automatically_reload_config = true
 
 local bg_brightness = 0.05
 local isWindows = wezterm.target_triple == "x86_64-pc-windows-msvc"
+local isLightTheme = wezterm.gui.get_appearance() == "Light"
 
 --=======--
 --==  ==--
 --=======--
 if isWindows then
-	bg_brightness = 0.1
-
+	config.term = "xterm-256color"
 	config.default_prog = { "pwsh", "-NoLogo" }
-	-- fonts
+
+	-- Font
 	config.font = wezterm.font("ShureTechMono Nerd Font Mono")
 	config.font_size = 16
-	-- bg
-	config.window_background_image = "K:/imgs/_vscode/static/_WhiteBg/Mechanic Corpse ThinkPad Wallpaper.png"
+
+	-- Theme
+	bg_brightness = isLightTheme and 0.89 or 0.06
+	config.colors = { foreground = isLightTheme and "#2f2f2f" or "#cfcfcf" }
+	config.color_scheme = isLightTheme and "Vs Code Light+ (Gogh)" or "Ir Black (Gogh)"
+
+	if isLightTheme then
+		config.window_background_image = "K:/imgs/_vscode/static/_WhiteBg/whitewaves.jpg"
+	else
+		config.window_background_image = "K:/imgs/_vscode/static/_WhiteBg/Mechanic Corpse ThinkPad Wallpaper.png"
+	end
 else
 	config.window_background_image = "/home/deli/sGchLE5.jpeg"
 end
 
--- config.color_scheme = "Grey-green"
--- config.color_scheme = "Ir Black (Gogh)"
 config.default_cursor_style = "BlinkingBlock"
-
-config.colors = {
-	foreground = "#f0f0f0",
-}
-
-config.front_end = "OpenGL"
+config.front_end = "WebGpu"
 config.animation_fps = 240
 config.max_fps = 240
 config.cursor_blink_rate = 300
