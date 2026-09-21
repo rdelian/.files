@@ -65,5 +65,20 @@ Set-Alias -Name cd -Value __zoxide_z -Option AllScope -Force
 # oh-my-posh has command caching resulting in faster prompts
 oh-my-posh init pwsh --config '~\.files\oh-my-posh\config.omp.json' | Invoke-Expression
 
+# CWD reporting for WezTerm/Zellij - oh-my-posh compatible (zellij#5052)
+$__ompPrompt = (Get-Item function:prompt).ScriptBlock
+function global:prompt {
+    $__oscLoc = $executionContext.SessionState.Path.CurrentLocation
+    if ($__oscLoc.Provider.Name -eq "FileSystem") {
+        [System.Environment]::CurrentDirectory = $__oscLoc.ProviderPath
+        $__esc = [char]27
+        $__fwd = $__oscLoc.ProviderPath -replace "\\", "/"
+        [Console]::Out.Write("$__esc]7;file://${env:COMPUTERNAME}/$__fwd$__esc\")
+        [Console]::Out.Write("$__esc]9;9;$($__oscLoc.ProviderPath)$__esc\")
+        [Console]::Out.Flush()
+    }
+    (& $__ompPrompt) -join "`n"
+}
+
 $PWD.Path
 
