@@ -2,33 +2,24 @@ local wezterm = require("wezterm")
 local config = wezterm.config_builder()
 config.automatically_reload_config = true
 
-local bg_brightness = 0.05
+local wallpaper = require("wallpaper")
+local appearance = wezterm.gui.get_appearance()
+local isLightTheme = type(appearance) == "string" and appearance:find("Light") ~= nil
+local bg_brightness = isLightTheme and wallpaper.LIGHT_BRIGHTNESS or wallpaper.DARK_BRIGHTNESS
 local isWindows = wezterm.target_triple == "x86_64-pc-windows-msvc"
-local isLightTheme = wezterm.gui.get_appearance() == "Light"
 
---=======--
---==  ==--
---=======--
+-- Theme / appearance only. Wallpaper images are NOT hardcoded here:
 if isWindows then
 	config.term = "xterm-256color"
 	config.default_prog = { "pwsh", "-NoLogo" }
 
 	-- Font
 	config.font = wezterm.font("ShureTechMono Nerd Font Mono")
-	config.font_size = 16
+	config.font_size = 14
 
 	-- Theme
-	bg_brightness = isLightTheme and 0.89 or 0.06
 	config.colors = { foreground = isLightTheme and "#2f2f2f" or "#cfcfcf" }
 	config.color_scheme = isLightTheme and "Vs Code Light+ (Gogh)" or "Ir Black (Gogh)"
-
-	if isLightTheme then
-		config.window_background_image = "K:/imgs/_vscode/static/_WhiteBg/whitewaves.jpg"
-	else
-		config.window_background_image = "K:/imgs/_vscode/static/_WhiteBg/Mechanic Corpse ThinkPad Wallpaper.png"
-	end
-else
-	config.window_background_image = "/home/deli/sGchLE5.jpeg"
 end
 
 config.default_cursor_style = "BlinkingBlock"
@@ -49,40 +40,18 @@ config.hide_tab_bar_if_only_one_tab = true
 config.window_padding = { left = 0, right = 0, top = 0, bottom = 0 }
 config.window_close_confirmation = "NeverPrompt"
 
---====================--
---== TABLINE Plugin ==--
---====================--
-local tabline = wezterm.plugin.require("https://github.com/michaelbrusegard/tabline.wez")
-tabline.setup({
-	options = {
-		theme = "Catppuccin Mocha",
-		tabs_enabled = true,
-		section_separators = {
-			left = wezterm.nerdfonts.ple_upper_left_triangle,
-			right = wezterm.nerdfonts.ple_upper_right_triangle,
-		},
-		component_separators = {
-			left = wezterm.nerdfonts.pl_left_soft_divider,
-			right = wezterm.nerdfonts.pl_right_soft_divider,
-		},
-		tab_separators = {
-			right = wezterm.nerdfonts.ple_lower_right_triangle,
-			left = wezterm.nerdfonts.ple_lower_left_triangle,
-		},
-	},
-	sections = {
-		tabline_a = { "datetime" },
-		tabline_b = { "🪐" },
-		tabline_c = {},
-		tab_active = { { "process", padding = 1 } },
-		tab_inactive = { { "process", padding = 1 } },
-		-- tabline_x = { { "cpu", use_pwsh = isWindows } },
-		tabline_x = { "hostname" },
-		tabline_y = {},
-		tabline_z = { "domain" },
-	},
-	extensions = {},
-})
-tabline.apply_to_config(config)
+-- Tabline status bar (see tabline.lua).
+require("tabline").apply_to_config(config)
+
+-- Wallpaper background switching
+wallpaper.apply_to_config(config)
+
+-- All custom keybindings live here. New scripts: expose `.commands`
+-- (see keybinds.lua header) and add the module to the list below.
+local keybinds = require("keybinds")
+keybinds.apply_to_config(config, { wallpaper })
+
+-- LEADER+h cheatsheet + launcher for everything registered above.
+require("help").apply_to_config(config)
 
 return config
