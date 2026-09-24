@@ -7,8 +7,8 @@ links:
   - src: nvim
     dest: "$HOME/.config/nvim"
     platforms: [linux, darwin]
-  - src: wezterm/wezterm.lua
-    dest: "$HOME/.config/wezterm/wezterm.lua"
+  - src: wezterm
+    dest: "$HOME/.config/wezterm"
   - src: powershell/Microsoft.PowerShell_profile.ps1
     dest: "$DOCUMENTS/WindowsPowerShell/Microsoft.PowerShell_profile.ps1"
     platforms: [win32]
