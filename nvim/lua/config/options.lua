@@ -2,8 +2,10 @@
 -- Default options that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/options.lua
 -- Add any additional options here
 -- Allow project-local `.nvim.lua` (runs on trust prompt)
-vim.opt.exrc = true
+
 vim.g.root_spec = { "cwd" }
+
+vim.opt.exrc = true
 vim.opt.list = true
 vim.opt.listchars = {
   tab = " ",
