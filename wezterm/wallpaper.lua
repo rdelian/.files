@@ -7,11 +7,10 @@ local M = {}
 
 -- Brightness values also read by wezterm.lua for the base config.
 M.LIGHT_BRIGHTNESS = 0.89
-M.DARK_BRIGHTNESS = 0.02
+M.DARK_BRIGHTNESS = 0.03
 
 local LIGHT_BRIGHTNESS = M.LIGHT_BRIGHTNESS
 local DARK_BRIGHTNESS = M.DARK_BRIGHTNESS
-
 local isWindows = wezterm.target_triple == "x86_64-pc-windows-msvc"
 
 local BG_ROOTS_WINDOWS = { "K:/imgs/_vscode/static" }
@@ -193,7 +192,7 @@ function M.apply_to_config(config)
 	local function scan_dir_recursive(root, out, depth)
 		out = out or {}
 		depth = depth or 0
-		if depth > 4 then
+		if depth > 99 then
 			return out
 		end
 		local ok, entries = pcall(wezterm.read_dir, root)
