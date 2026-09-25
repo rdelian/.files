@@ -1,3 +1,6 @@
+$env:EDITOR = "nvim"
+
+function lgit {lazygit}
 # dir -> eza  
 function l { eza --group-directories-first --no-filesize --icons=auto -hAl --git @args } 
 function lt { eza --icons=auto -hAlT --git $argv -I ".git|node_modules|.venv|__pycache__" }
@@ -54,15 +57,10 @@ function Invoke-AdminCommand {
 }
 Set-Alias -Name adminc -Value Invoke-AdminCommand
 
-# cd -> zoxide
+# Replace cd -> zoxide
 Invoke-Expression (& zoxide init powershell | Out-String)
 Set-Alias -Name cd -Value __zoxide_z -Option AllScope -Force
 
-# Starship
-# function Invoke-Starship-TransientFunction { &starship module character }
-# Invoke-Expression (&starship init powershell | Out-String)
-
-# oh-my-posh has command caching resulting in faster prompts
 oh-my-posh init pwsh --config '~\.files\oh-my-posh\config.omp.json' | Invoke-Expression
 
 # CWD reporting for WezTerm/Zellij - oh-my-posh compatible (zellij#5052)
