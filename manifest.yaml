@@ -18,10 +18,9 @@ links:
   - src: starship/starship-windows.toml
     dest: "$HOME/.config/starship.toml"
     platforms: [win32]
-  - src: zellij/config.kdl 
-    dest: "%APPDATA%/Zellij/config/config.kdl"
+  - src: zellij
+    dest: "$APPDATA/Zellij/config"
     platforms: [win32]
-  - src: zellij/compact-top.kdl 
-    dest: "%APPDATA%/Zellij/config/layouts/compact-top.kdl"
+  - src: lazygit/config.yml
+    dest: "$LOCALAPPDATA/lazygit/config.yml"
     platforms: [win32]
-
