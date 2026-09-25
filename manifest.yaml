@@ -1,26 +1,25 @@
-# Easy to edit — dest supports $HOME, $DOCUMENTS, %VAR%, ${VAR}, ~ platforms: [win32, linux, darwin] or omit for all
+# dest is string | string[] | {win32?, linux?, darwin?, default?} (values: string | string[])
+# dest supports $HOME, $DOCUMENTS, %VAR%, ${VAR}, ~ — platforms: [win32, linux, darwin] still works as extra filter
 
 links:
   - src: nvim
-    dest: "%LOCALAPPDATA%/nvim"
-    platforms: [win32]
-  - src: nvim
-    dest: "$HOME/.config/nvim"
-    platforms: [linux, darwin]
+    dest:
+      win32: "%LOCALAPPDATA%/nvim"
+      default: "$HOME/.config/nvim"
   - src: wezterm
     dest: "$HOME/.config/wezterm"
   - src: powershell/Microsoft.PowerShell_profile.ps1
-    dest: "$DOCUMENTS/WindowsPowerShell/Microsoft.PowerShell_profile.ps1"
-    platforms: [win32]
-  - src: powershell/Microsoft.PowerShell_profile.ps1
-    dest: "$DOCUMENTS/PowerShell/Microsoft.PowerShell_profile.ps1"
-    platforms: [win32]
+    dest:
+      win32:
+        - "$DOCUMENTS/WindowsPowerShell/Microsoft.PowerShell_profile.ps1"
+        - "$DOCUMENTS/PowerShell/Microsoft.PowerShell_profile.ps1"
   - src: starship/starship-windows.toml
-    dest: "$HOME/.config/starship.toml"
-    platforms: [win32]
+    dest:
+      win32: "$HOME/.config/starship.toml"
   - src: zellij
-    dest: "$APPDATA/Zellij/config"
-    platforms: [win32]
+    dest:
+      win32: "$APPDATA/Zellij/config"
   - src: lazygit/config.yml
-    dest: "$LOCALAPPDATA/lazygit/config.yml"
-    platforms: [win32]
+    dest:
+      win32: "$LOCALAPPDATA/lazygit/config.yml"
+      linux: "~/.config/lazygit/config.yml"

@@ -13,7 +13,8 @@ const CYAN = Bun.color("cyan", "ansi") ?? "\x1b[36m";
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
 
-type Entry = { src: string; dest: string; platforms?: string[] };
+type DestValue = string | string[] | Record<string, string | string[]>;
+type Entry = { src: string; dest: DestValue; platforms?: string[] };
 type Manifest = { links: Entry[] };
 
 class Bootstrap {
@@ -212,6 +213,10 @@ class Bootstrap {
     }
   }
 
+  private isValidDestString(s: unknown): s is string {
+    return typeof s === "string" && !!s.trim();
+  }
+
   private validateManifest(raw: unknown): Manifest {
     if (typeof raw !== "object" || raw === null) throw new Error('manifest must be an object with "links" array');
     const m = raw as Record<string, unknown>;
@@ -226,7 +231,35 @@ class Bootstrap {
       const src = e.src;
       const dest = e.dest;
       const platforms = e.platforms;
-      if (typeof src !== "string" || !src.trim() || typeof dest !== "string" || !dest.trim()) {
+      if (typeof src !== "string" || !src.trim()) {
+        console.warn(`${YELLOW}skip invalid [${i}] ${JSON.stringify(e)}${RESET}`);
+        continue;
+      }
+      let normDest: DestValue | undefined;
+      if (this.isValidDestString(dest)) {
+        normDest = (dest as string).trim();
+      } else if (Array.isArray(dest)) {
+        const arr = dest.filter((d): d is string => this.isValidDestString(d)).map((d) => d.trim());
+        if (!arr.length) {
+          console.warn(`${YELLOW}skip invalid dest [${i}] ${JSON.stringify(e)}${RESET}`);
+          continue;
+        }
+        normDest = arr;
+      } else if (typeof dest === "object" && dest !== null) {
+        const map: Record<string, string | string[]> = {};
+        for (const [k, v] of Object.entries(dest as Record<string, unknown>)) {
+          if (this.isValidDestString(v)) map[k] = (v as string).trim();
+          else if (Array.isArray(v)) {
+            const arr = (v as unknown[]).filter((d): d is string => this.isValidDestString(d)).map((d) => d.trim());
+            if (arr.length) map[k] = arr;
+          }
+        }
+        if (!Object.keys(map).length) {
+          console.warn(`${YELLOW}skip invalid dest [${i}] ${JSON.stringify(e)}${RESET}`);
+          continue;
+        }
+        normDest = map;
+      } else {
         console.warn(`${YELLOW}skip invalid [${i}] ${JSON.stringify(e)}${RESET}`);
         continue;
       }
@@ -236,9 +269,19 @@ class Bootstrap {
           continue;
         }
       }
-      links.push({ src: src.trim(), dest: dest.trim(), platforms: platforms as string[] | undefined });
+      links.push({ src: src.trim(), dest: normDest, platforms: platforms as string[] | undefined });
     }
     return { links };
+  }
+
+  private resolveDests(entry: Entry): string[] {
+    const { dest } = entry;
+    if (typeof dest === "string") return [dest];
+    if (Array.isArray(dest)) return [...dest];
+    const key = process.platform;
+    const val = dest[key] ?? dest["default"];
+    if (val === undefined) return [];
+    return typeof val === "string" ? [val] : [...val];
   }
 
   private async loadManifest(): Promise<Manifest> {
@@ -270,7 +313,12 @@ class Bootstrap {
 
     for (const e of manifest.links) {
       if (e.platforms?.length && !e.platforms.includes(process.platform)) {
-        console.log(`${DIM}skip ${e.src} -> ${e.dest} (not ${process.platform})${RESET}`);
+        console.log(`${DIM}skip ${e.src} (not ${process.platform})${RESET}`);
+        continue;
+      }
+      const destRaws = this.resolveDests(e);
+      if (!destRaws.length) {
+        console.log(`${DIM}skip ${e.src} (no dest for ${process.platform})${RESET}`);
         continue;
       }
       // Resolve target and guard against path traversal outside repoRoot.
@@ -285,12 +333,14 @@ class Bootstrap {
         console.warn(`${YELLOW}warn: missing ${target}${RESET}`);
         continue;
       }
-      const dest = this.expandDest(e.dest);
-      try {
-        this.ensureLink(target, dest);
-        processed++;
-      } catch {
-        hadError = true;
+      for (const destRaw of destRaws) {
+        const dest = this.expandDest(destRaw);
+        try {
+          this.ensureLink(target, dest);
+          processed++;
+        } catch {
+          hadError = true;
+        }
       }
     }
 
@@ -329,7 +379,7 @@ if (positionals.length) console.log(`${YELLOW}warn: ignoring ${positionals.join(
 if (values.help) {
   console.log(`${CYAN}Usage: bun bootstrap.ts [--dry-run|-d] [--force|-f] [--help|-h]${RESET}
 
-Manifest: ./manifest.yaml — {src, dest, platforms?} dest supports $HOME, $DOCUMENTS, %VAR%, \${VAR}, ~`);
+Manifest: ./manifest.yaml — {src, dest, platforms?} dest is string | string[] | {win32?, linux?, darwin?, default?} (values string|string[]), supports $HOME, $DOCUMENTS, %VAR%, \${VAR}, ~`);
   process.exit(0);
 }
 
