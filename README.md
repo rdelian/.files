@@ -14,6 +14,7 @@ irm bun.sh/install.ps1 | iex
 # Linux
 curl -fsSL https://bun.sh/install | bash
 ```
+
 Flags: `--dry-run`/`-d`, `--force`/`-f`, `--help`/`-h`.
 
 # Init
@@ -34,12 +35,15 @@ Files are **symlinks** - so you can edit either the target or repo files, in the
 
 1. Move file into repo: `mv ~/.config/foo ~/.files/foo`
 2. Add entry to `manifest.yaml`:
+
    ```yaml
    links:
      - src: foo
        dest: "$HOME/.config/foo"
    ```
+
    Or platform-specific:
+
    ```yaml
    links:
      - src: foo
@@ -49,7 +53,9 @@ Files are **symlinks** - so you can edit either the target or repo files, in the
        dest: "$HOME/.config/foo"
        platforms: [linux]
    ```
+
    Or multi platform:
+
    ```yaml
    links:
      - src: nvim
@@ -58,10 +64,12 @@ Files are **symlinks** - so you can edit either the target or repo files, in the
    ```
 
 ## Notes
+
 - **Admin**: Windows symlinks need elevation or Developer Mode. `bun bootstrap.ts --force` tries anyway; `--dry-run` safe.
 - **Backups**: existing files moved to `*.bak-YYYYMMDD-HHmmss`, not deleted.
 
-## Run example:
+## Run example
+
 ```bash
 # Test run #
 C:\Users\rdelian\.files>bun bootstrap.ts -d
