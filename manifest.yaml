@@ -13,9 +13,6 @@ links:
       win32:
         - "$DOCUMENTS/WindowsPowerShell/Microsoft.PowerShell_profile.ps1"
         - "$DOCUMENTS/PowerShell/Microsoft.PowerShell_profile.ps1"
-  - src: starship/starship-windows.toml
-    dest:
-      win32: "$HOME/.config/starship.toml"
   - src: zellij
     dest:
       win32: "$APPDATA/Zellij/config"

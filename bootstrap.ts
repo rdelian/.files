@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { homedir } from "node:os";
-import { join, dirname, resolve, normalize, sep } from "node:path";
+import { dirname, join, normalize, resolve, sep } from "node:path";
 import { existsSync, lstatSync, mkdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -17,379 +17,296 @@ type DestValue = string | string[] | Record<string, string | string[]>;
 type Entry = { src: string; dest: DestValue; platforms?: string[] };
 type Manifest = { links: Entry[] };
 
-class Bootstrap {
-  private readonly repoRoot: string;
-  private readonly docs: string;
-  private readonly dryRun: boolean;
-  private readonly force: boolean;
-  private readonly _isWin: boolean;
+const USAGE = `${CYAN}Usage: bun bootstrap.ts [--dry-run|-d] [--force|-f] [--help|-h]${RESET}`;
+const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-  constructor(dryRun: boolean, force: boolean) {
-    this.dryRun = dryRun;
-    this.force = force;
-    this._isWin = process.platform === "win32";
-    this.repoRoot = this.resolveRepoRoot();
-    this.docs = this.getDocumentsPath();
-  }
-
-  private resolveRepoRoot(): string {
-    const meta = import.meta as unknown as { dir?: string };
-    if (meta.dir) return resolve(meta.dir);
-    return resolve(dirname(fileURLToPath(import.meta.url)));
-  }
-
-  private isWin(): boolean {
-    return this._isWin;
-  }
-
-  private getDocumentsPath(): string {
-    if (!this.isWin()) return homedir();
-    try {
-      const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", "[Environment]::GetFolderPath('MyDocuments')"], {
-        encoding: "utf-8",
-        timeout: 3000,
-      });
-      const out = r.stdout?.trim() ?? "";
-      if (out && existsSync(out)) return out;
-    } catch {}
-    const oneDrive = join(homedir(), "OneDrive", "Documents");
-    if (existsSync(oneDrive)) return oneDrive;
-    return join(homedir(), "Documents");
-  }
-
-  private getEnv(name: string): string | undefined {
-    const k = name.trim();
-    if (!k) return undefined;
-    return (
-      (Bun.env as Record<string, string | undefined>)[k] ??
-      process.env[k] ??
-      (Bun.env as Record<string, string | undefined>)[k.toUpperCase()] ??
-      process.env[k.toUpperCase()]
-    );
-  }
-
-  private resolveWellKnown(name: string): string | undefined {
-    const key = name.trim().toUpperCase();
-    switch (key) {
-      case "HOME":
-        return homedir();
-      case "XDG_CONFIG_HOME":
-        return join(homedir(), ".config");
-      case "LOCALAPPDATA":
-        return join(homedir(), "AppData", "Local");
-      case "DOCUMENTS":
-        return this.docs;
-      default:
-        return undefined;
-    }
-  }
-
-  private expandDest(raw: string): string {
-    let s = raw;
-    if (s === "~") s = homedir();
-    else if (s.startsWith("~/")) s = join(homedir(), s.slice(2));
-
-    // Fast-path well-known $DOCUMENTS variants before generic env expansion.
-    s = s.replaceAll("$DOCUMENTS", this.docs).replaceAll("${DOCUMENTS}", this.docs).replaceAll("%DOCUMENTS%", this.docs);
-
-    s = s.replace(/%([^%]+)%/g, (_, n: string) => this.getEnv(n) ?? this.resolveWellKnown(n) ?? "");
-    s = s.replace(/\$\{([^}]+)\}/g, (_, n: string) => this.getEnv(n) ?? this.resolveWellKnown(n) ?? "");
-    s = s.replace(/\$([A-Za-z_][A-Za-z0-9_]*)/g, (_, n: string) => this.getEnv(n) ?? this.resolveWellKnown(n) ?? "");
-    return normalize(s);
-  }
-
-  private ensureParent(path: string): void {
-    const dir = dirname(path);
-    if (this.dryRun) {
-      if (!existsSync(dir)) console.log(`${YELLOW}[DRY] mkdir ${dir}${RESET}`);
-      return;
-    }
-    try {
-      mkdirSync(dir, { recursive: true });
-    } catch (e: unknown) {
-      // EEXIST is benign with recursive:true under race; rethrow otherwise.
-      const code = (e as NodeJS.ErrnoException)?.code;
-      if (code !== "EEXIST") throw e;
-    }
-    // console.log(`${DIM}mkdir ${dir}${RESET}`);
-  }
-
-  private isSymlink(p: string): boolean {
-    try {
-      return lstatSync(p).isSymbolicLink();
-    } catch {
-      return false;
-    }
-  }
-
-  private linkType(target: string): "junction" | "file" | undefined {
-    if (!this.isWin()) return undefined;
-    try {
-      return statSync(target).isDirectory() ? "junction" : "file";
-    } catch {
-      return "file";
-    }
-  }
-
-  private timestamp(): string {
-    const d = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const pad3 = (n: number) => String(n).padStart(3, "0");
-    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${pad3(d.getMilliseconds())}`;
-  }
-
-  private ensureLink(target: string, link: string): void {
-    this.ensureParent(link);
-
-    if (this.isSymlink(link)) {
-      let actual: string;
-      try { actual = readlinkSync(link); } catch { actual = ""; }
-      let aRes: string;
-      try { aRes = existsSync(actual) ? realpathSync(actual) : resolve(dirname(link), actual); } catch { aRes = actual; }
-      let tRes: string;
-      try { tRes = existsSync(target) ? realpathSync(target) : resolve(target); } catch { tRes = target; }
-      const win = this.isWin();
-      const normA = win ? aRes.replace(/\\/g, "/").toLowerCase() : aRes.replace(/\\/g, "/");
-      const normT = win ? tRes.replace(/\\/g, "/").toLowerCase() : tRes.replace(/\\/g, "/");
-      if (normA === normT) {
-        console.log(`${GREEN}ok   ${link} -> ${target}${RESET}`);
-        return;
-      }
-      console.log(`${YELLOW}fix  ${link} -> ${actual} (want ${target})${RESET}`);
-      if (this.dryRun) {
-        console.log(`${YELLOW}[DRY] would recreate${RESET}`);
-        return;
-      }
-      rmSync(link, { force: true });
-    } else if (existsSync(link)) {
-      const backup = `${link}.bak-${this.timestamp()}`;
-      console.log(`${YELLOW}back ${link} -> ${backup}${RESET}`);
-      if (this.dryRun) {
-        console.log(`${YELLOW}[DRY] would backup${RESET}`);
-        return;
-      }
-      renameSync(link, backup);
-      console.log(`${DIM}  backed up${RESET}`);
-    }
-
-    if (this.dryRun) {
-      console.log(`${YELLOW}[DRY] mklink ${link} -> ${target}${RESET}`);
-      return;
-    }
-
-    const type = this.linkType(target);
-    try {
-      symlinkSync(target, link, type ?? undefined);
-      console.log(`${GREEN}link ${link} -> ${target}${RESET}`);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`${RED}Failed ${link} -> ${target}: ${msg}${RESET}`);
-      if (this.isWin()) console.log(`  Hint: Admin or Developer Mode, or --force`);
-      throw e;
-    }
-  }
-
-  private checkPrivileges(): void {
-    if (!this.isWin() || this.dryRun) return;
-
-    let isAdmin = false;
-    let devMode = false;
-    try {
-      const ps = [
-        "$a=[Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent();",
-        "$isAdmin=$a.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator);",
-        "$dev=try{(Get-ItemPropertyValue -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock' -Name 'AllowDevelopmentWithoutDevLicense' -ErrorAction Stop) -eq 1}catch{$false};",
-        "Write-Output $isAdmin; Write-Output $dev",
-      ].join(" ");
-      const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf-8", timeout: 4000 });
-      const lines = (r.stdout ?? "").split(/\r?\n/).map((l) => l.trim().toLowerCase()).filter(Boolean);
-      isAdmin = lines[0] === "true";
-      devMode = lines[1] === "true";
-    } catch {}
-
-    if (!isAdmin && !devMode) {
-      console.warn(`${YELLOW}WARN: Not elevated and DevMode OFF${RESET}`);
-      if (!this.force) throw new Error("Aborting: not elevated and Developer Mode off. Use --force or enable Developer Mode.");
-    }
-  }
-
-  private isValidDestString(s: unknown): s is string {
-    return typeof s === "string" && !!s.trim();
-  }
-
-  private validateManifest(raw: unknown): Manifest {
-    if (typeof raw !== "object" || raw === null) throw new Error('manifest must be an object with "links" array');
-    const m = raw as Record<string, unknown>;
-    if (!Array.isArray(m.links)) throw new Error('missing "links" array');
-    const links: Entry[] = [];
-    for (let i = 0; i < m.links.length; i++) {
-      const e = m.links[i] as Record<string, unknown>;
-      if (typeof e !== "object" || e === null) {
-        console.warn(`${YELLOW}skip invalid [${i}] ${JSON.stringify(e)}${RESET}`);
-        continue;
-      }
-      const src = e.src;
-      const dest = e.dest;
-      const platforms = e.platforms;
-      if (typeof src !== "string" || !src.trim()) {
-        console.warn(`${YELLOW}skip invalid [${i}] ${JSON.stringify(e)}${RESET}`);
-        continue;
-      }
-      let normDest: DestValue | undefined;
-      if (this.isValidDestString(dest)) {
-        normDest = (dest as string).trim();
-      } else if (Array.isArray(dest)) {
-        const arr = dest.filter((d): d is string => this.isValidDestString(d)).map((d) => d.trim());
-        if (!arr.length) {
-          console.warn(`${YELLOW}skip invalid dest [${i}] ${JSON.stringify(e)}${RESET}`);
-          continue;
-        }
-        normDest = arr;
-      } else if (typeof dest === "object" && dest !== null) {
-        const map: Record<string, string | string[]> = {};
-        for (const [k, v] of Object.entries(dest as Record<string, unknown>)) {
-          if (this.isValidDestString(v)) map[k] = (v as string).trim();
-          else if (Array.isArray(v)) {
-            const arr = (v as unknown[]).filter((d): d is string => this.isValidDestString(d)).map((d) => d.trim());
-            if (arr.length) map[k] = arr;
-          }
-        }
-        if (!Object.keys(map).length) {
-          console.warn(`${YELLOW}skip invalid dest [${i}] ${JSON.stringify(e)}${RESET}`);
-          continue;
-        }
-        normDest = map;
-      } else {
-        console.warn(`${YELLOW}skip invalid [${i}] ${JSON.stringify(e)}${RESET}`);
-        continue;
-      }
-      if (platforms !== undefined) {
-        if (!Array.isArray(platforms) || !platforms.every((p) => typeof p === "string")) {
-          console.warn(`${YELLOW}skip invalid platforms [${i}] ${JSON.stringify(e)}${RESET}`);
-          continue;
-        }
-      }
-      links.push({ src: src.trim(), dest: normDest, platforms: platforms as string[] | undefined });
-    }
-    return { links };
-  }
-
-  private resolveDests(entry: Entry): string[] {
-    const { dest } = entry;
-    if (typeof dest === "string") return [dest];
-    if (Array.isArray(dest)) return [...dest];
-    const key = process.platform;
-    const val = dest[key] ?? dest["default"];
-    if (val === undefined) return [];
-    return typeof val === "string" ? [val] : [...val];
-  }
-
-  private async loadManifest(): Promise<Manifest> {
-    const path = join(this.repoRoot, "manifest.yaml");
-    let text: string;
-    try {
-      text = await Bun.file(path).text();
-    } catch (e: unknown) {
-      throw new Error(`Failed to read ${path}: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    let parsed: unknown;
-    try {
-      parsed = Bun.YAML.parse(text);
-    } catch (e: unknown) {
-      throw new Error(`Failed to parse ${path}: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    return this.validateManifest(parsed);
-  }
-
-  async run(): Promise<void> {
-    console.log(`${CYAN}RepoRoot: ${this.repoRoot}${RESET}`);
-    if (this.dryRun) console.log(`${YELLOW}[DRY RUN] no changes${RESET}`);
-    if (this.isWin()) console.log(`${DIM}Documents: ${this.docs}${RESET}`);
-
-    this.checkPrivileges();
-    const manifest = await this.loadManifest();
-    let processed = 0;
-    let hadError = false;
-
-    for (const e of manifest.links) {
-      if (e.platforms?.length && !e.platforms.includes(process.platform)) {
-        console.log(`${DIM}skip ${e.src} (not ${process.platform})${RESET}`);
-        continue;
-      }
-      const destRaws = this.resolveDests(e);
-      if (!destRaws.length) {
-        console.log(`${DIM}skip ${e.src} (no dest for ${process.platform})${RESET}`);
-        continue;
-      }
-      // Resolve target and guard against path traversal outside repoRoot.
-      const joined = join(this.repoRoot, e.src);
-      const target = resolve(joined);
-      const rootWithSep = this.repoRoot.endsWith(sep) ? this.repoRoot : this.repoRoot + sep;
-      if (target !== this.repoRoot && !target.startsWith(rootWithSep)) {
-        console.warn(`${YELLOW}skip traversal ${e.src} -> ${target} outside repo${RESET}`);
-        continue;
-      }
-      if (!existsSync(target)) {
-        console.warn(`${YELLOW}warn: missing ${target}${RESET}`);
-        continue;
-      }
-      for (const destRaw of destRaws) {
-        const dest = this.expandDest(destRaw);
-        try {
-          this.ensureLink(target, dest);
-          processed++;
-        } catch {
-          hadError = true;
-        }
-      }
-    }
-
-    console.log(`\n${CYAN}Done. Processed ${processed} links.${RESET}`);
-    if (this.dryRun) console.log(`${YELLOW}Dry run — re-run without --dry-run${RESET}`);
-    if (hadError) throw new Error(`One or more links failed`);
-  }
-}
-
-///////////////////////////////////////////////////
-
-let values: Record<string, unknown> = {};
-let positionals: string[] = [];
+// ---- CLI (must run before anything else, same errors/exits as before) ----
+let dryRun = false;
+let force = false;
 try {
-  const parsed = parseArgs({
+  const { values, positionals } = parseArgs({
     args: Bun.argv.slice(2),
-    options: {
-      "dry-run": { type: "boolean", short: "d" },
-      force: { type: "boolean", short: "f" },
-      help: { type: "boolean", short: "h" },
-    },
+    options: { "dry-run": { type: "boolean", short: "d" }, force: { type: "boolean", short: "f" }, help: { type: "boolean", short: "h" } },
     strict: true,
     allowPositionals: true,
   });
-  values = parsed.values as Record<string, unknown>;
-  positionals = parsed.positionals as string[];
-} catch (e: unknown) {
-  const msg = e instanceof Error ? e.message : String(e);
-  console.error(`${RED}Args error: ${msg}${RESET}`);
-  console.log(`${CYAN}Usage: bun bootstrap.ts [--dry-run|-d] [--force|-f] [--help|-h]${RESET}`);
+  dryRun = Boolean(values["dry-run"]);
+  force = Boolean(values.force);
+  if (positionals.length) console.log(`${YELLOW}warn: ignoring ${positionals.join(" ")}${RESET}`);
+  if (values.help) {
+    console.log(`${USAGE}
+
+Manifest: ./manifest.yaml — {src, dest, platforms?} dest is string | string[] | {win32?, linux?, darwin?, default?} (values string|string[]), supports $HOME, $DOCUMENTS, %VAR%, \${VAR}, ~`);
+    process.exit(0);
+  }
+} catch (e) {
+  console.error(`${RED}Args error: ${msg(e)}${RESET}`);
+  console.log(USAGE);
   process.exit(1);
 }
 
-if (positionals.length) console.log(`${YELLOW}warn: ignoring ${positionals.join(" ")}${RESET}`);
+// ---- Context ----
+const isWin = process.platform === "win32";
+const repoRoot = (() => {
+  const meta = import.meta as unknown as { dir?: string };
+  return meta.dir ? resolve(meta.dir) : resolve(dirname(fileURLToPath(import.meta.url)));
+})();
+const docs = ((): string => {
+  if (!isWin) return homedir();
+  try {
+    const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", "[Environment]::GetFolderPath('MyDocuments')"], { encoding: "utf-8", timeout: 3000 });
+    const out = r.stdout?.trim() ?? "";
+    if (out && existsSync(out)) return out;
+  } catch {}
+  const oneDrive = join(homedir(), "OneDrive", "Documents");
+  return existsSync(oneDrive) ? oneDrive : join(homedir(), "Documents");
+})();
 
-if (values.help) {
-  console.log(`${CYAN}Usage: bun bootstrap.ts [--dry-run|-d] [--force|-f] [--help|-h]${RESET}
-
-Manifest: ./manifest.yaml — {src, dest, platforms?} dest is string | string[] | {win32?, linux?, darwin?, default?} (values string|string[]), supports $HOME, $DOCUMENTS, %VAR%, \${VAR}, ~`);
-  process.exit(0);
+// ---- Dest expansion: env + well-known vars ----
+function lookupVar(name: string): string | undefined {
+  const key = name.trim();
+  if (!key) return undefined;
+  const env = Bun.env as Record<string, string | undefined>;
+  const hit = env[key] ?? process.env[key] ?? env[key.toUpperCase()] ?? process.env[key.toUpperCase()];
+  if (hit !== undefined) return hit;
+  switch (key.toUpperCase()) {
+    case "HOME": return homedir();
+    case "XDG_CONFIG_HOME": return join(homedir(), ".config");
+    case "LOCALAPPDATA": return join(homedir(), "AppData", "Local");
+    case "DOCUMENTS": return docs;
+  }
 }
 
-const app = new Bootstrap(Boolean(values["dry-run"]), Boolean(values.force));
+function expandDest(raw: string): string {
+  let s = raw === "~" ? homedir() : raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
+  s = s.replaceAll("$DOCUMENTS", docs).replaceAll("${DOCUMENTS}", docs).replaceAll("%DOCUMENTS%", docs);
+  return normalize(
+    s
+      .replace(/%([^%]+)%/g, (_, n: string) => lookupVar(n) ?? "")
+      .replace(/\$\{([^}]+)\}/g, (_, n: string) => lookupVar(n) ?? "")
+      .replace(/\$([A-Za-z_][A-Za-z0-9_]*)/g, (_, n: string) => lookupVar(n) ?? ""),
+  );
+}
+
+// ---- Filesystem helpers ----
+function ensureParent(link: string): void {
+  const dir = dirname(link);
+  if (dryRun) {
+    if (!existsSync(dir)) console.log(`${YELLOW}[DRY] mkdir ${dir}${RESET}`);
+    return;
+  }
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException)?.code !== "EEXIST") throw e;
+  }
+}
+
+const isSymlink = (p: string): boolean => {
+  try { return lstatSync(p).isSymbolicLink(); } catch { return false; }
+};
+
+const linkType = (target: string): "junction" | "file" | undefined => {
+  if (!isWin) return undefined;
+  try { return statSync(target).isDirectory() ? "junction" : "file"; } catch { return "file"; }
+};
+
+const timestamp = (): string => {
+  const d = new Date();
+  const p = (n: number, len = 2) => String(n).padStart(len, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${p(d.getMilliseconds(), 3)}`;
+};
+
+const canon = (p: string): string => {
+  const s = p.replace(/\\/g, "/");
+  return isWin ? s.toLowerCase() : s;
+};
+
+const resolveExisting = (p: string, base?: string): string => {
+  try { return existsSync(p) ? realpathSync(p) : base ? resolve(base, p) : resolve(p); } catch { return p; }
+};
+
+function ensureLink(target: string, link: string): void {
+  ensureParent(link);
+
+  if (isSymlink(link)) {
+    const actual = (() => { try { return readlinkSync(link); } catch { return ""; } })();
+    if (canon(resolveExisting(actual, dirname(link))) === canon(resolveExisting(target))) {
+      console.log(`${GREEN}ok   ${link} -> ${target}${RESET}`);
+      return;
+    }
+    console.log(`${YELLOW}fix  ${link} -> ${actual} (want ${target})${RESET}`);
+    if (dryRun) {
+      console.log(`${YELLOW}[DRY] would recreate${RESET}`);
+      return;
+    }
+    rmSync(link, { force: true });
+  } else if (existsSync(link)) {
+    const backup = `${link}.bak-${timestamp()}`;
+    console.log(`${YELLOW}back ${link} -> ${backup}${RESET}`);
+    if (dryRun) {
+      console.log(`${YELLOW}[DRY] would backup${RESET}`);
+      return;
+    }
+    renameSync(link, backup);
+    console.log(`${DIM}  backed up${RESET}`);
+  }
+
+  if (dryRun) {
+    console.log(`${YELLOW}[DRY] mklink ${link} -> ${target}${RESET}`);
+    return;
+  }
+
+  try {
+    symlinkSync(target, link, linkType(target) ?? undefined);
+    console.log(`${GREEN}link ${link} -> ${target}${RESET}`);
+  } catch (e) {
+    console.error(`${RED}Failed ${link} -> ${target}: ${msg(e)}${RESET}`);
+    if (isWin) console.log(`  Hint: Admin or Developer Mode, or --force`);
+    throw e;
+  }
+}
+
+function checkPrivileges(): void {
+  if (!isWin || dryRun) return;
+  let admin = false;
+  let dev = false;
+  try {
+    const ps = [
+      "$a=[Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent();",
+      "$isAdmin=$a.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator);",
+      "$dev=try{(Get-ItemPropertyValue -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock' -Name 'AllowDevelopmentWithoutDevLicense' -ErrorAction Stop) -eq 1}catch{$false};",
+      "Write-Output $isAdmin; Write-Output $dev",
+    ].join(" ");
+    const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf-8", timeout: 4000 });
+    const lines = (r.stdout ?? "").split(/\r?\n/).map((l) => l.trim().toLowerCase()).filter(Boolean);
+    admin = lines[0] === "true";
+    dev = lines[1] === "true";
+  } catch {}
+  if (!admin && !dev) {
+    console.warn(`${YELLOW}WARN: Not elevated and DevMode OFF${RESET}`);
+    if (!force) throw new Error("Aborting: not elevated and Developer Mode off. Use --force or enable Developer Mode.");
+  }
+}
+
+// ---- Manifest ----
+const cleanStr = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+const cleanStrArray = (v: unknown): string[] | undefined =>
+  Array.isArray(v) ? (v.map(cleanStr).filter(Boolean) as string[]) : undefined;
+const warnSkip = (i: number, e: unknown, kind = ""): void => {
+  console.warn(`${YELLOW}skip invalid${kind} [${i}] ${JSON.stringify(e)}${RESET}`);
+};
+
+function validateManifest(raw: unknown): Manifest {
+  if (typeof raw !== "object" || raw === null) throw new Error('manifest must be an object with "links" array');
+  if (!Array.isArray((raw as Record<string, unknown>).links)) throw new Error('missing "links" array');
+  const links: Entry[] = [];
+  for (let i = 0; i < (raw as { links: unknown[] }).links.length; i++) {
+    const item = (raw as { links: unknown[] }).links[i];
+    const e = item as Record<string, unknown>;
+    const src = typeof e?.src === "string" ? e.src.trim() : "";
+    if (typeof e !== "object" || !e || !src) { warnSkip(i, item); continue; }
+
+    let dest: DestValue | undefined;
+    const one = cleanStr(e.dest);
+    if (one) dest = one;
+    else if (Array.isArray(e.dest)) {
+      const arr = cleanStrArray(e.dest)!;
+      if (!arr.length) { warnSkip(i, item, " dest"); continue; }
+      dest = arr;
+    } else if (typeof e.dest === "object" && e.dest !== null) {
+      const map: Record<string, string | string[]> = {};
+      for (const [k, v] of Object.entries(e.dest as Record<string, unknown>)) {
+        const s = cleanStr(v);
+        if (s) { map[k] = s; continue; }
+        const arr = cleanStrArray(v);
+        if (arr?.length) map[k] = arr;
+      }
+      if (!Object.keys(map).length) { warnSkip(i, item, " dest"); continue; }
+      dest = map;
+    } else { warnSkip(i, item); continue; }
+
+    if (e.platforms !== undefined && (!Array.isArray(e.platforms) || !e.platforms.every((p) => typeof p === "string"))) {
+      warnSkip(i, item, " platforms");
+      continue;
+    }
+    links.push({ src, dest, platforms: e.platforms as string[] | undefined });
+  }
+  return { links };
+}
+
+function resolveDests(entry: Entry): string[] {
+  if (typeof entry.dest === "string") return [entry.dest];
+  if (Array.isArray(entry.dest)) return [...entry.dest];
+  const val = entry.dest[process.platform] ?? entry.dest["default"];
+  if (val === undefined) return [];
+  return typeof val === "string" ? [val] : [...val];
+}
+
+async function loadManifest(): Promise<Manifest> {
+  const path = join(repoRoot, "manifest.yaml");
+  let text: string;
+  try {
+    text = await Bun.file(path).text();
+  } catch (e) {
+    throw new Error(`Failed to read ${path}: ${msg(e)}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = Bun.YAML.parse(text);
+  } catch (e) {
+    throw new Error(`Failed to parse ${path}: ${msg(e)}`);
+  }
+  return validateManifest(parsed);
+}
+
+// ---- Run ----
+async function run(): Promise<void> {
+  console.log(`${CYAN}RepoRoot: ${repoRoot}${RESET}`);
+  if (dryRun) console.log(`${YELLOW}[DRY RUN] no changes${RESET}`);
+  if (isWin) console.log(`${DIM}Documents: ${docs}${RESET}`);
+
+  checkPrivileges();
+  const { links } = await loadManifest();
+  let processed = 0;
+  let failed = false;
+
+  for (const e of links) {
+    if (e.platforms?.length && !e.platforms.includes(process.platform)) {
+      console.log(`${DIM}skip ${e.src} (not ${process.platform})${RESET}`);
+      continue;
+    }
+    const dests = resolveDests(e);
+    if (!dests.length) {
+      console.log(`${DIM}skip ${e.src} (no dest for ${process.platform})${RESET}`);
+      continue;
+    }
+    const target = resolve(join(repoRoot, e.src));
+    const rootSlashed = repoRoot.endsWith(sep) ? repoRoot : repoRoot + sep;
+    if (target !== repoRoot && !target.startsWith(rootSlashed)) {
+      console.warn(`${YELLOW}skip traversal ${e.src} -> ${target} outside repo${RESET}`);
+      continue;
+    }
+    if (!existsSync(target)) {
+      console.warn(`${YELLOW}warn: missing ${target}${RESET}`);
+      continue;
+    }
+    for (const raw of dests) {
+      try {
+        ensureLink(target, expandDest(raw));
+        processed++;
+      } catch { failed = true; }
+    }
+  }
+
+  console.log(`\n${CYAN}Done. Processed ${processed} links.${RESET}`);
+  if (dryRun) console.log(`${YELLOW}Dry run — re-run without --dry-run${RESET}`);
+  if (failed) throw new Error(`One or more links failed`);
+}
 
 try {
-  await app.run();
-} catch (e: unknown) {
-  const msg = e instanceof Error ? e.message : String(e);
-  // Avoid double-logging for errors already logged inside ensureLink; only log top-level context.
-  if (msg !== "One or more links failed") console.error(`${RED}${msg}${RESET}`);
+  await run();
+} catch (e) {
+  if (msg(e) !== "One or more links failed") console.error(`${RED}${msg(e)}${RESET}`);
   process.exit(1);
 }
