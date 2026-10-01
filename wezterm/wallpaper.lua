@@ -38,6 +38,29 @@ local function basename(path)
 	return path:match("([^/\\]+)$") or path
 end
 
+local function display_label(path)
+	-- Relative subfolders without the root, e.g. "_whitebg > file.jpg".
+	-- Longest matching root wins so overlapping roots stay short.
+	local roots = isWindows and BG_ROOTS_WINDOWS or BG_ROOTS_LINUX
+	local path_norm = path:gsub("\\", "/")
+	local path_cmp = isWindows and path_norm:lower() or path_norm
+	local best = nil
+	for _, root in ipairs(roots) do
+		local root_norm = root:gsub("\\", "/"):gsub("/+$", "")
+		local root_cmp = isWindows and root_norm:lower() or root_norm
+		if path_cmp:sub(1, #root_cmp + 1) == root_cmp .. "/" then
+			local rel = path_norm:sub(#root_norm + 2)
+			if best == nil or #rel < #best then
+				best = rel
+			end
+		end
+	end
+	if best == nil or best == "" then
+		return basename(path)
+	end
+	return (best:gsub("/", " > "))
+end
+
 local function is_image(path)
 	local ext = path:match("%.([^%.\\/]+)$")
 	return ext ~= nil and IMAGE_EXTS[ext:lower()] == true
@@ -215,8 +238,16 @@ function M.apply_to_config(config)
 	local function get_background_images()
 		local roots = isWindows and BG_ROOTS_WINDOWS or BG_ROOTS_LINUX
 		local images = {}
+		local seen = {}
 		for _, root in ipairs(roots) do
-			scan_dir_recursive(root, images, 0)
+			local found = {}
+			scan_dir_recursive(root, found, 0)
+			for _, path in ipairs(found) do
+				if not seen[path] then
+					seen[path] = true
+					table.insert(images, path)
+				end
+			end
 		end
 		table.sort(images)
 		return images
@@ -294,7 +325,7 @@ function M.apply_to_config(config)
 		end
 		local choices = {}
 		for idx, path in ipairs(images) do
-			table.insert(choices, { id = tostring(idx), label = basename(path) })
+			table.insert(choices, { id = tostring(idx), label = display_label(path) })
 		end
 		window:perform_action(
 			act.InputSelector({
