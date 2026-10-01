@@ -1,4 +1,5 @@
 -- wallpaper.lua: background picker (fuzzy find or random), saved per theme.
+-- Uses the layered `background` API: image + optional solid-color filter.
 -- Call apply_to_config(config) from wezterm.lua. A pick also sets the startup image.
 local wezterm = require("wezterm")
 local act = wezterm.action
@@ -6,11 +7,18 @@ local act = wezterm.action
 local M = {}
 
 -- Brightness values also read by wezterm.lua for the base config.
-M.LIGHT_BRIGHTNESS = 0.89
+M.LIGHT_BRIGHTNESS = 1.0
 M.DARK_BRIGHTNESS = 0.03
 
 local LIGHT_BRIGHTNESS = M.LIGHT_BRIGHTNESS
 local DARK_BRIGHTNESS = M.DARK_BRIGHTNESS
+
+-- Optional solid-color filter over the image, per theme (light/dark).
+-- Toggle with LEADER+o. Color/opacity live here; only on/off is saved.
+M.OVERLAY = {
+	light = { enabled = false, color = "#ffffff", opacity = 0.8 },
+	dark = { enabled = false, color = "#ffffff", opacity = 0.25 },
+}
 local isWindows = wezterm.target_triple == "x86_64-pc-windows-msvc"
 
 local BG_ROOTS_WINDOWS = { "K:/imgs/_vscode/static" }
@@ -91,9 +99,7 @@ local function is_light_appearance(appearance)
 end
 
 local function bucket_for_appearance(appearance)
-	if not isWindows then
-		return "linux"
-	end
+	-- Theme only. OS matters for search paths, not for buckets.
 	return is_light_appearance(appearance) and "light" or "dark"
 end
 
@@ -131,7 +137,130 @@ local function last_bucket_key(window)
 	return nil
 end
 
--- Same theme keeps the pick, theme change loads the saved image.
+local function clamp_opacity(v)
+	v = tonumber(v)
+	if v == nil then
+		return nil
+	end
+	return math.min(1, math.max(0, v))
+end
+
+local function overlay_key(bucket)
+	return bucket .. "_overlay"
+end
+
+-- Saved on/off for a bucket. Tolerates the old table form.
+local function saved_overlay_flag(saved, bucket)
+	local v = saved and saved[overlay_key(bucket)]
+	if type(v) == "table" then
+		return v.enabled == true
+	end
+	if v ~= nil then
+		return v == true
+	end
+	local d = M.OVERLAY and M.OVERLAY[bucket]
+	return type(d) == "table" and d.enabled == true
+end
+
+-- Overlay for a bucket: on/off from the saved file, color/opacity from code.
+local function get_overlay(bucket, saved)
+	local ov = { enabled = saved_overlay_flag(saved, bucket), color = "#ffffff", opacity = 0.25 }
+	local d = M.OVERLAY and M.OVERLAY[bucket]
+	if type(d) == "table" then
+		if type(d.color) == "string" and d.color ~= "" then
+			ov.color = d.color
+		end
+		local op = clamp_opacity(d.opacity)
+		if op ~= nil then
+			ov.opacity = op
+		end
+	end
+	return ov
+end
+
+-- Image path for a bucket (plain-string entries).
+local function saved_image_path(saved, bucket)
+	local v = saved and saved[bucket]
+	if type(v) == "string" then
+		return v
+	end
+	if type(v) == "table" and type(v.path) == "string" then
+		return v.path
+	end
+	return nil
+end
+
+local function layer_image_path(layer)
+	if type(layer) ~= "table" then
+		return nil
+	end
+	local src = layer.source
+	if type(src) ~= "table" then
+		return nil
+	end
+	if type(src.File) == "string" then
+		return src.File
+	end
+	if type(src.File) == "table" and type(src.File.path) == "string" then
+		return src.File.path
+	end
+	return nil
+end
+
+-- Layer 1: image with brightness. Layer 2 (optional): solid-color filter.
+local function build_background(path, appearance, saved)
+	if not saved_file_exists(path) then
+		return nil
+	end
+	local bucket = bucket_for_appearance(appearance)
+	local layers = {
+		{ source = { File = path }, hsb = { brightness = brightness_for_appearance(appearance) } },
+	}
+	local ov = get_overlay(bucket, saved or load_saved_backgrounds())
+	if ov.enabled then
+		table.insert(layers, {
+			source = { Color = ov.color },
+			opacity = ov.opacity,
+			width = "100%",
+			height = "100%",
+		})
+	end
+	return layers
+end
+
+-- Current live state: image path, overlay, brightness. Reads the new
+-- `background` layers first, then legacy window_background_image keys.
+local function live_background_state(overrides)
+	overrides = overrides or {}
+	local bg = overrides.background
+	if type(bg) == "table" and #bg > 0 then
+		local img = layer_image_path(bg[1])
+		local ov = { enabled = false }
+		if type(bg[2]) == "table" and type(bg[2].source) == "table" and type(bg[2].source.Color) == "string" then
+			ov = { enabled = true, color = bg[2].source.Color, opacity = tonumber(bg[2].opacity) or 1.0 }
+		end
+		local hsb = type(bg[1]) == "table" and bg[1].hsb
+		local bright = type(hsb) == "table" and hsb.brightness or nil
+		return img, ov, bright
+	end
+	local hsb = overrides.window_background_image_hsb
+	local bright = type(hsb) == "table" and hsb.brightness or nil
+	return overrides.window_background_image, { enabled = false }, bright
+end
+
+local function same_overlay(a, b)
+	a = a or { enabled = false }
+	b = b or { enabled = false }
+	if (a.enabled == true) ~= (b.enabled == true) then
+		return false
+	end
+	if not a.enabled then
+		return true
+	end
+	return a.color == b.color and a.opacity == b.opacity
+end
+
+-- Same theme keeps the pick, theme change loads the saved image + overlay.
 local function sync_window_to_saved_theme(window)
 	if not window then
 		return
@@ -141,18 +270,24 @@ local function sync_window_to_saved_theme(window)
 	local desired_brightness = brightness_for_appearance(appearance)
 
 	local saved = load_saved_backgrounds()
-	local desired_image = saved_file_exists(saved[bucket]) and saved[bucket] or nil
+	local raw = saved_image_path(saved, bucket)
+	local desired_image = saved_file_exists(raw) and raw or nil
+	local desired_background = build_background(desired_image, appearance, saved)
+	local desired_overlay = get_overlay(bucket, saved)
 
 	local overrides = window:get_config_overrides() or {}
-	local cur_image = overrides.window_background_image
-	local cur_hsb = overrides.window_background_image_hsb
-	local cur_brightness = type(cur_hsb) == "table" and cur_hsb.brightness or nil
+	local cur_image, cur_overlay, cur_brightness = live_background_state(overrides)
 
-	if cur_image == nil and cur_brightness == nil then
+	if
+		overrides.background == nil
+		and overrides.window_background_image == nil
+		and overrides.window_background_image_hsb == nil
+	then
+		-- Fresh window: the base config already applied it, just track state.
 		wezterm.GLOBAL.bg_current = desired_image
-		local k = last_bucket_key(window)
-		if k then
-			wezterm.GLOBAL[k] = bucket
+		local k0 = last_bucket_key(window)
+		if k0 then
+			wezterm.GLOBAL[k0] = bucket
 		end
 		return
 	end
@@ -166,29 +301,31 @@ local function sync_window_to_saved_theme(window)
 		last_bucket = bucket
 	end
 
-	if last_bucket ~= bucket then
-		if desired_image == nil then
-			overrides.window_background_image = nil
-			overrides.window_background_image_hsb = nil
-		else
-			overrides.window_background_image = desired_image
-			overrides.window_background_image_hsb = { brightness = desired_brightness }
-		end
+	local function apply_desired()
+		overrides.background = desired_background
+		overrides.window_background_image = nil
+		overrides.window_background_image_hsb = nil
 		wezterm.GLOBAL.bg_current = desired_image
 		if k then
 			wezterm.GLOBAL[k] = bucket
 		end
 		window:set_config_overrides(overrides)
+	end
+
+	if last_bucket ~= bucket then
+		apply_desired()
 		return
 	end
 
-	if cur_brightness ~= desired_brightness then
-		if cur_image == nil then
-			overrides.window_background_image_hsb = nil
-		else
-			overrides.window_background_image_hsb = { brightness = desired_brightness }
-		end
-		window:set_config_overrides(overrides)
+	if
+		cur_image ~= desired_image
+		or cur_brightness ~= desired_brightness
+		or not same_overlay(cur_overlay, desired_overlay)
+		or overrides.window_background_image ~= nil
+		or overrides.window_background_image_hsb ~= nil
+	then
+		-- The legacy-key check migrates pre-`background` overrides one last time.
+		apply_desired()
 	end
 end
 
@@ -197,20 +334,19 @@ wezterm.on("window-config-reloaded", function(window, _pane)
 	pcall(sync_window_to_saved_theme, window)
 end)
 
-local function startup_bucket()
-	return bucket_for_appearance(gui_appearance())
-end
-
 function M.apply_to_config(config)
-	-- Startup image from saved file, or none if the file is missing.
+	-- Startup layers from the saved file, or none if the file is missing.
+	-- Uses the new `background` API (image + optional color filter) and
+	-- clears the legacy window_background_image* keys (don't mix old/new).
 	local saved_bgs = load_saved_backgrounds()
 	pcall(wezterm.add_to_config_reload_watch_list, SAVED_BG_PATH)
-	local bucket = startup_bucket()
-	if saved_file_exists(saved_bgs[bucket]) then
-		config.window_background_image = saved_bgs[bucket]
-	else
-		config.window_background_image = nil
-	end
+	local startup_appearance = gui_appearance()
+	local bucket = bucket_for_appearance(startup_appearance)
+	local raw = saved_image_path(saved_bgs, bucket)
+	local startup_image = saved_file_exists(raw) and raw or nil
+	config.background = build_background(startup_image, startup_appearance, saved_bgs)
+	config.window_background_image = nil
+	config.window_background_image_hsb = nil
 
 	local function scan_dir_recursive(root, out, depth)
 		out = out or {}
@@ -259,40 +395,57 @@ function M.apply_to_config(config)
 			return nil, err
 		end
 		f:write("return {\n")
-		for _, k in ipairs({ "light", "dark", "linux" }) do
-			if tbl[k] and tbl[k] ~= "" then
-				f:write(string.format("  %s = %q,\n", k, tbl[k]))
+		for _, k in ipairs({ "light", "dark" }) do
+			local v = tbl[k]
+			if type(v) == "table" then
+				v = v.path
 			end
+			if type(v) == "string" and v ~= "" then
+				f:write(string.format("  %s = %q,\n", k, v))
+			end
+			-- Overlays are plain booleans.
+			f:write(string.format("  %s = %s,\n", overlay_key(k), tostring(saved_overlay_flag(tbl, k))))
 		end
 		f:write("}\n")
 		f:close()
 		return true
 	end
 
+	local function save_table(tbl, what)
+		local ok, err = write_saved_backgrounds(tbl)
+		if not ok then
+			wezterm.log_error("wallpaper persist failed (" .. what .. "): " .. tostring(err))
+		end
+		return ok
+	end
+
+	local function set_window_background(window, bucket, layers, image_path)
+		-- Mutate (don't replace) so unrelated overrides survive; legacy keys out.
+		local overrides = window:get_config_overrides() or {}
+		overrides.background = layers
+		overrides.window_background_image = nil
+		overrides.window_background_image_hsb = nil
+		window:set_config_overrides(overrides)
+		wezterm.GLOBAL.bg_current = image_path
+		local k = last_bucket_key(window)
+		if k then
+			wezterm.GLOBAL[k] = bucket
+		end
+	end
+
 	local function apply_background(window, path)
-		-- A pick applies live and is stored as the theme default.
+		-- A pick applies live and is stored as the theme default (overlay kept).
 		if not path then
 			return
 		end
 		local appearance = window_appearance(window)
 		local bucket = bucket_for_appearance(appearance)
-		window:set_config_overrides({
-			window_background_image = path,
-			window_background_image_hsb = { brightness = brightness_for_appearance(appearance) },
-		})
-		wezterm.GLOBAL.bg_current = path
-		local k = last_bucket_key(window)
-		if k then
-			wezterm.GLOBAL[k] = bucket
-		end
+		local saved = load_saved_backgrounds()
+		set_window_background(window, bucket, build_background(path, appearance, saved), path)
 		local tbl = load_saved_backgrounds()
 		if tbl[bucket] ~= path then
 			tbl[bucket] = path
-			local ok, err = write_saved_backgrounds(tbl)
-			if not ok then
-				wezterm.log_error("wallpaper persist failed: " .. tostring(err))
-				window:toast_notification("wezterm", "Persist failed: " .. tostring(err), nil, 4000)
-			else
+			if save_table(tbl, "image") then
 				wezterm.log_info("Wallpaper (" .. bucket .. "): " .. path)
 			end
 		end
@@ -300,13 +453,41 @@ function M.apply_to_config(config)
 
 	local function current_background_path(window)
 		local overrides = window:get_config_overrides() or {}
-		return overrides.window_background_image or wezterm.GLOBAL.bg_current or config.window_background_image
+		local img = live_background_state(overrides)
+		if img ~= nil then
+			return img
+		end
+		if wezterm.GLOBAL.bg_current ~= nil then
+			return wezterm.GLOBAL.bg_current
+		end
+		local cfg_bg = config.background
+		if type(cfg_bg) == "table" and #cfg_bg > 0 then
+			return layer_image_path(cfg_bg[1])
+		end
+		return config.window_background_image
+	end
+
+	local function toggle_overlay(window)
+		-- Flip the color filter for the current theme, keep the image.
+		if not window then
+			return
+		end
+		local appearance = window_appearance(window)
+		local bucket = bucket_for_appearance(appearance)
+		local saved = load_saved_backgrounds()
+		saved[overlay_key(bucket)] = not saved_overlay_flag(saved, bucket)
+		if not save_table(saved, "overlay") then
+			return
+		end
+		local path = current_background_path(window)
+		set_window_background(window, bucket, build_background(path, appearance, load_saved_backgrounds()), path)
+		wezterm.log_info("Wallpaper overlay (" .. bucket .. "): " .. tostring(saved[overlay_key(bucket)]))
 	end
 
 	local function random_background(window)
 		local images = get_background_images()
 		if #images == 0 then
-			window:toast_notification("wezterm", "No background images found", nil, 2000)
+			wezterm.log_warn("wallpaper: no background images found")
 			return
 		end
 		local current = current_background_path(window)
@@ -320,7 +501,7 @@ function M.apply_to_config(config)
 	local function pick_background(window, pane)
 		local images = get_background_images()
 		if #images == 0 then
-			window:toast_notification("wezterm", "No background images found", nil, 2000)
+			wezterm.log_warn("wallpaper: no background images found")
 			return
 		end
 		local choices = {}
@@ -359,6 +540,13 @@ function M.apply_to_config(config)
 			desc = "Random background (auto-saved for this theme)",
 			run = function(window, _)
 				random_background(window)
+			end,
+		},
+		{
+			key = "o",
+			desc = "Toggle color filter overlay for this theme (auto-saved)",
+			run = function(window, _)
+				toggle_overlay(window)
 			end,
 		},
 	}
