@@ -20,3 +20,9 @@ links:
     dest:
       win32: "$LOCALAPPDATA/lazygit/config.yml"
       linux: "~/.config/lazygit/config.yml"
+  - src: hypr
+    dest:
+      linux: "~/.config/hypr"
+  - src: yazi
+    dest:
+      linux: "~/.config/yazi"

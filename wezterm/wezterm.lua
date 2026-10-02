@@ -13,17 +13,23 @@ local isWindows = wezterm.target_triple == "x86_64-pc-windows-msvc"
 if isWindows then
 	config.term = "xterm-256color"
 	config.default_prog = { "pwsh", "-NoLogo" }
-
-	-- Font
 	config.font = wezterm.font("ShureTechMono Nerd Font Mono")
 	config.font_size = 14
+else
+	config.enable_wayland = false
+	config.window_decorations = "NONE"
+	config.front_end = "OpenGL"
+	config.font = wezterm.font("Iosevka Nerd Font Mono")
+	config.font_size = 14
+	-- config.enable_kitty_keyboard = true
+	-- config.term = "xterm-kitty"
 end
 
 config.colors = { foreground = isLightTheme and "#2f2f2f" or "#cfcfcf" }
 config.color_scheme = isLightTheme and "Vs Code Light+ (Gogh)" or "Ir Black (Gogh)"
 
-config.default_cursor_style = "BlinkingBlock"
 -- config.front_end = "WebGpu"
+config.default_cursor_style = "BlinkingBlock"
 config.animation_fps = 240
 config.max_fps = 240
 config.cursor_blink_rate = 300
