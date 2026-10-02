@@ -3,6 +3,7 @@ local config = wezterm.config_builder()
 config.automatically_reload_config = true
 
 local wallpaper = require("wallpaper")
+
 local appearance = wezterm.gui.get_appearance()
 local isLightTheme = type(appearance) == "string" and appearance:find("Light") ~= nil
 local bg_brightness = isLightTheme and wallpaper.LIGHT_BRIGHTNESS or wallpaper.DARK_BRIGHTNESS
@@ -16,14 +17,13 @@ if isWindows then
 	-- Font
 	config.font = wezterm.font("ShureTechMono Nerd Font Mono")
 	config.font_size = 14
-
-	-- Theme
-	config.colors = { foreground = isLightTheme and "#2f2f2f" or "#cfcfcf" }
-	config.color_scheme = isLightTheme and "Vs Code Light+ (Gogh)" or "Ir Black (Gogh)"
 end
 
+config.colors = { foreground = isLightTheme and "#2f2f2f" or "#cfcfcf" }
+config.color_scheme = isLightTheme and "Vs Code Light+ (Gogh)" or "Ir Black (Gogh)"
+
 config.default_cursor_style = "BlinkingBlock"
-config.front_end = "WebGpu"
+-- config.front_end = "WebGpu"
 config.animation_fps = 240
 config.max_fps = 240
 config.cursor_blink_rate = 300

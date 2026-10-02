@@ -8,7 +8,7 @@ local M = {}
 
 -- Brightness values also read by wezterm.lua for the base config.
 M.LIGHT_BRIGHTNESS = 1.0
-M.DARK_BRIGHTNESS = 0.03
+M.DARK_BRIGHTNESS = 0.05
 
 local LIGHT_BRIGHTNESS = M.LIGHT_BRIGHTNESS
 local DARK_BRIGHTNESS = M.DARK_BRIGHTNESS
@@ -17,15 +17,14 @@ local DARK_BRIGHTNESS = M.DARK_BRIGHTNESS
 -- Toggle with LEADER+o. Color/opacity live here; only on/off is saved.
 M.OVERLAY = {
 	light = { enabled = false, color = "#ffffff", opacity = 0.8 },
-	dark = { enabled = false, color = "#ffffff", opacity = 0.25 },
+	dark = { enabled = false, color = "#000000", opacity = 0.3 },
 }
 local isWindows = wezterm.target_triple == "x86_64-pc-windows-msvc"
 
-local BG_ROOTS_WINDOWS = { "K:/imgs/_vscode/static" }
+local BG_ROOTS_WINDOWS = { "K:/imgs/_vscode", "K:/imgs/_wp" }
 local BG_ROOTS_LINUX = {
-	wezterm.home_dir .. "/Pictures/backgrounds",
-	wezterm.home_dir .. "/Pictures",
-	"/home/deli/Pictures",
+	wezterm.home_dir .. "/Pictures/win/imgs/_vscode",
+	wezterm.home_dir .. "/Pictures/win/imgs/_wp",
 }
 
 local IMAGE_EXTS = {
@@ -279,9 +278,9 @@ local function sync_window_to_saved_theme(window)
 	local cur_image, cur_overlay, cur_brightness = live_background_state(overrides)
 
 	if
-		overrides.background == nil
-		and overrides.window_background_image == nil
-		and overrides.window_background_image_hsb == nil
+			overrides.background == nil
+			and overrides.window_background_image == nil
+			and overrides.window_background_image_hsb == nil
 	then
 		-- Fresh window: the base config already applied it, just track state.
 		wezterm.GLOBAL.bg_current = desired_image
@@ -318,11 +317,11 @@ local function sync_window_to_saved_theme(window)
 	end
 
 	if
-		cur_image ~= desired_image
-		or cur_brightness ~= desired_brightness
-		or not same_overlay(cur_overlay, desired_overlay)
-		or overrides.window_background_image ~= nil
-		or overrides.window_background_image_hsb ~= nil
+			cur_image ~= desired_image
+			or cur_brightness ~= desired_brightness
+			or not same_overlay(cur_overlay, desired_overlay)
+			or overrides.window_background_image ~= nil
+			or overrides.window_background_image_hsb ~= nil
 	then
 		-- The legacy-key check migrates pre-`background` overrides one last time.
 		apply_desired()
