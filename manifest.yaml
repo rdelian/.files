@@ -26,3 +26,6 @@ links:
   - src: yazi
     dest:
       linux: "~/.config/yazi"
+  - src: omarchy
+    dest:
+      linux: "~/.config/omarchy"

@@ -18,3 +18,5 @@ nvim/.undo/
 # wezterm - no cache, saved wallpaper is per-machine state
 wezterm/saved-backgrounds.lua
 # powershell - no secrets (repo is public)
+
+omarchy/themes
