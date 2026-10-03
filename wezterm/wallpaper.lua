@@ -16,8 +16,8 @@ local DARK_BRIGHTNESS = M.DARK_BRIGHTNESS
 -- Optional solid-color filter over the image, per theme (light/dark).
 -- Toggle with LEADER+o. Color/opacity live here; only on/off is saved.
 M.OVERLAY = {
-	light = { enabled = false, color = "#ffffff", opacity = 0.8 },
-	dark = { enabled = false, color = "#000000", opacity = 0.3 },
+	light = { enabled = true, color = "#ffffff", opacity = 0.8 },
+	dark = { enabled = true, color = "#000000", opacity = 0.3 },
 }
 local isWindows = wezterm.target_triple == "x86_64-pc-windows-msvc"
 
@@ -278,9 +278,9 @@ local function sync_window_to_saved_theme(window)
 	local cur_image, cur_overlay, cur_brightness = live_background_state(overrides)
 
 	if
-			overrides.background == nil
-			and overrides.window_background_image == nil
-			and overrides.window_background_image_hsb == nil
+		overrides.background == nil
+		and overrides.window_background_image == nil
+		and overrides.window_background_image_hsb == nil
 	then
 		-- Fresh window: the base config already applied it, just track state.
 		wezterm.GLOBAL.bg_current = desired_image
@@ -317,11 +317,11 @@ local function sync_window_to_saved_theme(window)
 	end
 
 	if
-			cur_image ~= desired_image
-			or cur_brightness ~= desired_brightness
-			or not same_overlay(cur_overlay, desired_overlay)
-			or overrides.window_background_image ~= nil
-			or overrides.window_background_image_hsb ~= nil
+		cur_image ~= desired_image
+		or cur_brightness ~= desired_brightness
+		or not same_overlay(cur_overlay, desired_overlay)
+		or overrides.window_background_image ~= nil
+		or overrides.window_background_image_hsb ~= nil
 	then
 		-- The legacy-key check migrates pre-`background` overrides one last time.
 		apply_desired()
